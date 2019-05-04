@@ -33,7 +33,6 @@ const
 for (let i = 0; i < BHTs.length; i++) {
 	decoder.addAnimation(i, BHTs[i]);
 }
-console.log('decoder: ', decoder);
 
 let
 	CAMERA_DISTANCE = 750,

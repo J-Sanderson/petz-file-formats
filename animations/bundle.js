@@ -20,7 +20,7 @@ const
 			type: "uint16le",
 			length: "numBalls"
 		})
-		
+
 		.array("unknown3", {
 			type: "uint8",
 			length: function() {
@@ -28,13 +28,21 @@ const
 				return this.version === 14 /* BHD_VERSION_BABYZ */ ? 160 : 0;
 			}
 		})
-		
+
+		//padding for species with less than 67 ballz
+		.array("padding", {
+			type: "uint16le",
+			length: function() {
+				return 67 - this.numBalls;
+			}
+		})
+
 		.uint16("animationCount")
 		.array("animationEndOffset", {
 			type: "uint16le",
 			length: "animationCount"
 		}),
-	
+
 	BHTHeader = new Parser()
 		.endianess("little")
 		.uint32("fileLength")
@@ -42,7 +50,7 @@ const
 		.string("copyright", {
 			zeroTerminated: true
 		}),
-	
+
 	BHTBallPosition = new Parser()
 		.endianess("little")
 		.int16("x")
@@ -68,10 +76,10 @@ const
 class PetzBHT {
 	constructor(bhd, animIndex, bhtRaw) {
 		this.frames = [];
-		
+
 		let
 			decoder = BHTFrameHeader(bhd.numBalls);
-		
+
 		for (let frameOffset of bhd.animationFrameOffsets[animIndex]) {
 			this.frames.push(decoder.parse(bhtRaw.slice(frameOffset)));
 		}
@@ -83,39 +91,39 @@ class PetzBHD {
 		const
 			header = BHDHeader.parse(bhdRaw),
 			frameData = bhdRaw.slice(header.framesOffset);
-		
+
 		// Bring the decoded fields of the header out as fields of this object
 		for (let fieldName in header) {
 			if (header.hasOwnProperty(fieldName)) {
 				this[fieldName] = header[fieldName];
 			}
 		}
-		
+
 		this.animations = [];
-		
+
 		for (let i = 0; i < header.animationCount; i++) {
 			let
 				animationStartOffset, /* Index into the 4-byte entries */
 				animationLength,
 				animFrameOffsets;
-			
+
 			if (i === 0) {
 				animationStartOffset = 0;
 			} else {
 				animationStartOffset = header.animationEndOffset[i - 1];
 			}
-			
+
 			animationLength = header.animationEndOffset[i] - animationStartOffset;
-			
+
 			animFrameOffsets = new Parser()
 				.endianess("little")
 				.array("frameOffsets", {
 					type: "uint32le",
 					length: animationLength
 				});
-			
+
 			animFrameOffsets = animFrameOffsets.parse(frameData.slice(animationStartOffset * 4));
-			
+
 			this.animations.push(animFrameOffsets.frameOffsets);
 		}
 	}
@@ -126,19 +134,20 @@ class PetzAnimationDecoder {
 	constructor(bhdRaw) {
 		let
 			parsed = new PetzBHD(bhdRaw);
-		
+
 		this.numBalls = parsed.numBalls;
 		this.ballSizes = parsed.ballSizes;
 		this.animationFrameOffsets = parsed.animations;
 		this.animations = [];
 	}
-	
+
 	addAnimation(animIndex, bhtRaw) {
 		this.animations[animIndex] = new PetzBHT(this, animIndex, bhtRaw);
 	}
 }
 
 module.exports = PetzAnimationDecoder;
+
 },{"binary-parser":4}],2:[function(require,module,exports){
 (function (Buffer){
 require("buffer"); // Load the Buffer polyfill
@@ -174,7 +183,6 @@ const
 for (let i = 0; i < BHTs.length; i++) {
 	decoder.addAnimation(i, BHTs[i]);
 }
-console.log('decoder: ', decoder);
 
 let
 	CAMERA_DISTANCE = 750,
